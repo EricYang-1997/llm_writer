@@ -8,6 +8,7 @@ from llama_index.graph_stores.memgraph import MemgraphPropertyGraphStore
 from llama_index.core import Document, Settings
 from llama_index.core.indices.property_graph import PropertyGraphIndex, SchemaLLMPathExtractor
 from llama_index.core import Settings, StorageContext,load_index_from_storage
+os.environ["OPENAI_API_KEY"] = "dummy"  # 防止任何 OpenAI 回退
 
 # ===================== 配置区（按需修改） =====================
 
@@ -23,24 +24,8 @@ TEXT_SEGMENTS = [
     途中屡遭追杀，最终在风雪山神庙手刃仇敌，彻底与朝廷决裂，投奔梁山。
     """,
     """
-    【鲁智深行侠】鲁智深原为提辖官，因打抱不平三拳打死镇关西，遁入空门，却仍不改豪侠本色，一路行侠仗义，终上梁山。
-    """,
-    """
-    【杨志与武松】还有因失陷花石纲而流落江湖的杨志、被官府逼得家破人亡的武松、因怒杀西门庆为兄报仇而刺配孟州的他，
-    都在命运的驱使下走上反抗之路。
-    """,
-    """
-    【晁盖与生辰纲】梁山泊起初只是零星草寇聚集之地。晁盖劫取生辰纲，引来官府围剿，幸得宋江通风报信，众人得以脱险，共上梁山。
-    """,
-    """
     【宋江领导与招安】晁盖身亡后，宋江成为首领。他素怀忠义，虽聚义梁山，却始终心向朝廷，主张“只反贪官，不反皇帝”。
     在他的带领下，梁山好汉屡败官军，打出“替天行道”的杏黄旗，招揽天下英雄，终成一百零八将齐聚水泊的盛况。
-    """,
-    """
-    【征方腊与结局】梁山的壮大引来朝廷忌惮。宋江接受朝廷招安，率众为国效力。
-    他们先征辽国，再平田虎、王庆、方腊等割据势力。虽屡建奇功，却伤亡惨重。
-    朝廷仍视梁山为隐患，以御酒赐毒，宋江、卢俊义等核心头领相继被害。
-    李逵饮毒酒殉主，吴用、花荣自缢于宋江墓前，梁山义军终归尘土。
     """,
     """
     【主题】《水浒传》以群像叙事展现乱世中个体的命运沉浮。
@@ -56,8 +41,6 @@ llm = OpenAILike(
     is_chat_model=True,
     timeout=300,
 )
-Settings.llm = llm  # ★ 关键：避免回退到 OpenAI
-
 # 2) Embedding（把维度设成与你的 Memgraph 向量索引一致，比如 1536）
 embed_model = OpenAILikeEmbedding(
     model_name="text-embedding-v4",  # 注意是 model_name= 而非 model=
@@ -65,14 +48,9 @@ embed_model = OpenAILikeEmbedding(
     api_key=DASHSCOPE_API_KEY,
     dimensions=1536              # 若你的索引是 1024/2048，则改成对应维度
 )
-Settings.embed_model = embed_model  # ★ 关键：避免回退到 OpenAI
-
+Settings.embed_model = embed_model  
 # 3) 连接 Memgraph
-graph_store = MemgraphPropertyGraphStore(
-    url="bolt://localhost:7688",
-    database="memgraph",
-    username="", password="" 
-)
+
 documents = [Document(text=t.strip()) for t in TEXT_SEGMENTS]
 
 EntityTypes = Literal["PERSON", "EVENT", "ORGANIZATION", "CONCEPT", "LOCATION"]
@@ -88,40 +66,95 @@ extractor = SchemaLLMPathExtractor(
     max_triplets_per_chunk=40,
     strict=False  # 强制遵守 schema
 )
-storage_context = StorageContext.from_defaults(graph_store=graph_store)
 
 # ===================== 构建图谱（含清库）=====================
 def build_graph_index():
     print("🧼 正在清空 Memgraph 并重建图谱...")
-    # 清库
     driver = GraphDatabase.driver("bolt://localhost:7688", auth=None)
     with driver.session() as session:
         session.run("MATCH (n) DETACH DELETE n")
+        session.run("DROP ALL INDEXES;")
     driver.close()
     print("✅ 图库已清空")
-
-
+    graph_store = MemgraphPropertyGraphStore(
+        url="bolt://localhost:7688",
+        database="memgraph",
+        username="", password="" 
+    )
     index = PropertyGraphIndex.from_documents(
         documents,
         llm=llm,
-        storage_context=storage_context,
         embed_model=embed_model,
         kg_extractors=[extractor],
         property_graph_store=graph_store,
         show_progress=True,
     )
     index.storage_context.persist(persist_dir="./storage")
-    print("✅ 图谱构建完成！")
-    return 
+    print("✅ 图谱构建并持久化完成！")
 
+    # 🔍 立即验证：直接查图数据库
+    print("\n🔍 验证图数据库中是否存在'风雪山神庙手刃仇敌'节点...")
+    driver = GraphDatabase.driver("bolt://localhost:7688", auth=None)
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:EVENT {name: "风雪山神庙手刃仇敌"})
+            RETURN e.name AS name, e.embedding IS NOT NULL AS has_embedding
+        """)
+        record = result.single()
+        if record:
+            print(f"✅ 节点存在，name: {record['name']}, 有 embedding: {record['has_embedding']}")
+        else:
+            print("❌ 节点不存在！")
+
+        # 验证是否连接到林冲
+        result2 = session.run("""
+            MATCH (p:PERSON {name: "林冲"})-[r]->(e:EVENT {name: "风雪山神庙手刃仇敌"})
+            RETURN count(r) AS rel_count
+        """)
+        rel_count = result2.single()["rel_count"]
+        print(f"✅ 林冲 → 事件 的关系数量: {rel_count}")
+    driver.close()
+
+    # 🔍 立即验证：用 retriever 检索
+    print("\n🔍 验证 retriever 能否检索到该事件...")
+    index._embed_model = embed_model
+    index._llm = llm
+    index._use_async = False
+    Settings.embed_model  = embed_model 
+    Settings.llm = llm 
+    retriever = index.as_retriever(
+        include_text=True,
+        include_graph=True,
+        similarity_top_k=10,
+    )
+    Settings.embed_model  = embed_model  
+    Settings.llm = llm 
+    nodes = retriever.retrieve("风雪山神庙手刃仇敌")
+    print(f"✅ retriever 检索到节点数量: {len(nodes)}")
+    for node in nodes:
+        print(f"  - {node.metadata.get('name', 'N/A')}")
+
+    nodes = retriever.retrieve("风雪山神庙")
+    print(f"✅ retriever 检索到节点数量: {len(nodes)}")
+    for node in nodes:
+        print(f"  - {node.metadata.get('name', 'N/A')}")
+
+    return index
 
 # ===================== 加载已有图谱 =====================
 def load_existing_graph_index():
     print("📂 从磁盘加载持久化图谱...")
+    # ✅ 从 persist_dir 自动加载全部存储组件
     storage_context = StorageContext.from_defaults(
-        persist_dir="./storage",
-        graph_store=graph_store  # 仍连接 Memgraph
+        persist_dir="./storage"
     )
+    graph_store = MemgraphPropertyGraphStore(
+        url="bolt://localhost:7688",
+        database="memgraph",
+        username="", password="" 
+    )
+    # 显式替换 graph_store（因为 Memgraph 连接不能序列化）
+    storage_context.graph_store = graph_store
     index = load_index_from_storage(storage_context)
     print("✅ 图谱索引加载成功！")
     return index
@@ -129,6 +162,8 @@ def load_existing_graph_index():
 # ===================== 循环对话 =====================
 def chat_with_graph(index):
     print("\n🔍 直接测试 retriever（输入 /q 退出）")
+    Settings.embed_model  = embed_model  
+    Settings.llm = llm 
     retriever = index.as_retriever(
         include_text=True,
         include_graph=True,
@@ -149,7 +184,7 @@ def chat_with_graph(index):
 
 # ===================== 主程序 =====================
 if __name__ == "__main__":
-    REBUILD_GRAPH = False
+    REBUILD_GRAPH = True
     if REBUILD_GRAPH:
         build_graph_index()
     else:
