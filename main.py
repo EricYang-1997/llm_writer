@@ -61,8 +61,8 @@ RelationTypes = Literal[
 ]
 extractor = SchemaLLMPathExtractor(
     llm=llm,
-    possible_entities=EntityTypes,
-    possible_relations=RelationTypes,
+    # possible_entities=EntityTypes,
+    # possible_relations=RelationTypes,
     max_triplets_per_chunk=40,
     strict=False  # 强制遵守 schema
 )
@@ -88,8 +88,9 @@ def build_graph_index():
         kg_extractors=[extractor],
         property_graph_store=graph_store,
         show_progress=True,
+        storage_context = StorageContext.from_defaults(graph_store=graph_store)
+
     )
-    index.storage_context.persist(persist_dir="./storage")
     print("✅ 图谱构建并持久化完成！")
 
     # 🔍 立即验证：直接查图数据库
@@ -145,18 +146,18 @@ def build_graph_index():
 def load_existing_graph_index():
     print("📂 从磁盘加载持久化图谱...")
     # ✅ 从 persist_dir 自动加载全部存储组件
-    storage_context = StorageContext.from_defaults(
-        persist_dir="./storage"
-    )
     graph_store = MemgraphPropertyGraphStore(
         url="bolt://localhost:7688",
         database="memgraph",
         username="", password="" 
     )
-    # 显式替换 graph_store（因为 Memgraph 连接不能序列化）
-    storage_context.graph_store = graph_store
-    index = load_index_from_storage(storage_context)
     print("✅ 图谱索引加载成功！")
+    index = PropertyGraphIndex.from_existing(
+        storage_context=StorageContext.from_defaults(graph_store=graph_store),
+        llm=llm,
+        embed_model=embed_model,
+        property_graph_store=graph_store,
+    )
     return index
 
 # ===================== 循环对话 =====================
@@ -184,10 +185,9 @@ def chat_with_graph(index):
 
 # ===================== 主程序 =====================
 if __name__ == "__main__":
-    REBUILD_GRAPH = True
+    REBUILD_GRAPH = False
     if REBUILD_GRAPH:
         build_graph_index()
     else:
         index = load_existing_graph_index()
-
         chat_with_graph(index)
