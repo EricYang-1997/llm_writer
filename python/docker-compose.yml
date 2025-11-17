@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  neo4j:
+    image: neo4j:5.20-community
+    environment:
+      - NEO4J_AUTH=neo4j/ygy1997666
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_apoc_meta_data_enabled=true
+    ports:
+      - "7474:7474"   # Neo4j Browser
+      - "7687:7687"   # Neo4j Bolt
+    restart: always
+
+  memgraph:
+    image: memgraph/memgraph-mage:latest
+    container_name: memgraph-mage
+    ports:
+      - "7688:7687"   # 将主机 7688 映射到容器 7687，避免与 Neo4j 冲突
+      - "7444:7444"   # Memgraph UI / mgconsole
+    command: ["--log-level=TRACE", "--schema-info-enabled"]
+
+  lab:
+    image: memgraph/lab:latest
+    container_name: memgraph-lab
+    ports:
+      - "3000:3000"
+    depends_on:
+      - memgraph
+    environment:
+      - QUICK_CONNECT_MG_HOST=memgraph
+      - QUICK_CONNECT_MG_PORT=7687    # 容器内端口仍是 7687

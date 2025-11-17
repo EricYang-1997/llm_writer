@@ -1,0 +1,106 @@
+/* components/Markdown/Markdown.css */
+.markdown-container {
+  position: relative;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 16px;
+  background-color: #fff;
+}
+
+.markdown-loading {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
+
+.markdown-error {
+  padding: 20px;
+  text-align: center;
+  color: #d9534f;
+  background-color: #f2dede;
+  border: 1px solid #ebccd1;
+  border-radius: 4px;
+  margin: 10px;
+}
+
+.markdown-controls {
+  margin-bottom: 12px;
+  text-align: right;
+}
+
+.edit-btn, .save-btn, .cancel-btn {
+  padding: 8px 16px;
+  margin-left: 8px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.edit-btn:hover, .save-btn:hover, .cancel-btn:hover {
+  background-color: #f5f5f5;
+}
+
+.save-btn {
+  background-color: #5cb85c;
+  color: white;
+  border-color: #4cae4c;
+}
+
+.save-btn:hover {
+  background-color: #449d44;
+}
+
+.cancel-btn {
+  background-color: #d9534f;
+  color: white;
+  border-color: #d43f3a;
+}
+
+.cancel-btn:hover {
+  background-color: #c9302c;
+}
+
+.edit-btn {
+  background-color: #337ab7;
+  color: white;
+  border-color: #2e6da4;
+}
+
+.edit-btn:hover {
+  background-color: #286090;
+}
+
+.markdown-editor-container {
+  position: relative;
+}
+
+.markdown-editor {
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  resize: vertical;
+  min-height: 300px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.editor-controls {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* 确保编辑按钮可见 */
+.markdown-controls button {
+  display: inline-block;
+}

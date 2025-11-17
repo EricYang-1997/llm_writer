@@ -1,0 +1,54 @@
+/* src/components/AppHeader.module.css */
+
+.appLayoutHeader {
+  background: rgba(255, 255, 255, 0.6); /* 半透明白色 */
+  backdrop-filter: blur(12px);           /* 毛玻璃核心 */
+  -webkit-backdrop-filter: blur(12px);   /* Safari 兼容 */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 0;
+  position: relative;
+  z-index: 200;
+  transition: box-shadow 0.3s, background 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+
+.headerContainer {
+  max-width: calc(100% - 16px);
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  line-height: 64px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.logoIcon {
+  font-size: 24px;
+  color: #1890ff;
+}
+
+.appName {
+  margin-left: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.searchInput {
+  width: 240px;
+  margin-left: 24px;
+}
+
+.headerBottom {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
